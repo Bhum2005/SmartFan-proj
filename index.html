@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Control Panel</title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0e17;
+            --panel: #111827;
+            --border: #1e3a5f;
+            --accent: #00d4ff;
+            --accent2: #00ff9d;
+            --warn: #ff6b35;
+            --danger: #ff2d55;
+            --text: #c9d6e3;
+            --dim: #4a6080;
+            --glow: 0 0 12px rgba(0, 212, 255, 0.4);
+            --glow2: 0 0 12px rgba(0, 255, 157, 0.4);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 24px 16px 40px;
+            background-image:
+                radial-gradient(ellipse at 20% 0%, rgba(0,100,180,0.12) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 100%, rgba(0,200,120,0.08) 0%, transparent 60%),
+                repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(30,58,95,0.25) 39px, rgba(30,58,95,0.25) 40px),
+                repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(30,58,95,0.15) 39px, rgba(30,58,95,0.15) 40px);
+        }
+
+        header { text-align: center; margin-bottom: 28px; }
+
+        header h1 {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.5rem;
+            letter-spacing: 0.18em;
+            color: var(--accent);
+            text-shadow: var(--glow);
+            text-transform: uppercase;
+        }
+
+        header .sub {
+            font-size: 0.78rem;
+            letter-spacing: 0.3em;
+            color: var(--dim);
+            margin-top: 4px;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .status-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 28px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.82rem;
+        }
+
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--dim);
+            display: inline-block;
+            margin-right: 6px;
+            transition: background 0.3s, box-shadow 0.3s;
+        }
+        .status-dot.on { background: var(--accent2); box-shadow: var(--glow2); }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            max-width: 640px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 18px 16px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity: 0.5;
+        }
+
+        .card.full { grid-column: 1 / -1; }
+
+        .card-label {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            color: #ffffff;
+            text-transform: uppercase;
+            margin-bottom: 14px;
+        }
+
+        .mode-toggle {
+            display: flex;
+            background: rgba(0,0,0,0.4);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 10px 0;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            font-size: 1rem;
+            letter-spacing: 0.1em;
+            border: none;
+            background: transparent;
+            color: var(--dim);
+            cursor: pointer;
+            transition: all 0.25s;
+            text-transform: uppercase;
+        }
+
+        .mode-btn.active-auto {
+            background: rgba(0, 212, 255, 0.12);
+            color: var(--accent);
+            text-shadow: var(--glow);
+        }
+
+        .mode-btn.active-manual {
+            background: rgba(0, 255, 157, 0.12);
+            color: var(--accent2);
+            text-shadow: var(--glow2);
+        }
+
+        .power-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .power-btn {
+            flex: 1;
+            padding: 12px 8px;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            font-size: 1rem;
+            letter-spacing: 0.08em;
+            border-radius: 7px;
+            border: 1px solid;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+
+        .btn-on {
+            background: rgba(0, 255, 157, 0.1);
+            border-color: var(--accent2);
+            color: var(--accent2);
+        }
+        .btn-on:hover { background: rgba(0, 255, 157, 0.22); box-shadow: var(--glow2); }
+
+        .btn-off {
+            background: rgba(255, 45, 85, 0.1);
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+        .btn-off:hover { background: rgba(255, 45, 85, 0.22); box-shadow: 0 0 12px rgba(255,45,85,0.4); }
+
+        .direction-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .dir-btn {
+            padding: 14px 8px;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            font-size: 0.95rem;
+            letter-spacing: 0.08em;
+            border-radius: 7px;
+            border: 1px solid var(--border);
+            background: rgba(0, 212, 255, 0.07);
+            color: var(--accent);
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .dir-btn:hover {
+            background: rgba(0, 212, 255, 0.18);
+            border-color: var(--accent);
+            box-shadow: var(--glow);
+        }
+
+        .dir-btn:active {
+            transform: scale(0.96);
+            background: rgba(0, 212, 255, 0.28);
+        }
+
+        .fan-speed-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+
+        .fan-btn {
+            padding: 12px 4px;
+            font-family: 'Share Tech Mono', monospace;
+            font-weight: 700;
+            font-size: 1rem;
+            letter-spacing: 0.05em;
+            border-radius: 7px;
+            border: 1px solid var(--border);
+            background: rgba(0, 212, 255, 0.06);
+            color: var(--dim);
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .fan-btn:hover {
+            background: rgba(0, 212, 255, 0.15);
+            border-color: var(--accent);
+            color: var(--accent);
+            box-shadow: var(--glow);
+        }
+
+        .fan-btn.active {
+            background: rgba(0, 212, 255, 0.2);
+            border-color: var(--accent);
+            color: var(--accent);
+            box-shadow: var(--glow);
+        }
+
+        .input-action-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .input-action-row .ctrl-input { flex: 1; min-width: 0; }
+        .input-action-row .send-btn { flex-shrink: 0; padding: 11px 18px; font-size: 0.9rem; min-width: 56px; min-height: 44px; }
+        .input-action-row .reset-btn { flex-shrink: 0; padding: 11px 14px; font-size: 1rem; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
+
+        .input-group { display: flex; flex-direction: column; gap: 10px; }
+        .input-row { display: flex; gap: 8px; align-items: center; }
+
+        .ctrl-input {
+            flex: 1;
+            background: rgba(0,0,0,0.4);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 9px 12px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.95rem;
+            color: var(--text);
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            width: 100%;
+        }
+
+        .ctrl-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0,212,255,0.12); }
+        .ctrl-input::placeholder { color: var(--dim); }
+
+        .send-btn {
+            padding: 11px 14px;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            font-size: 0.85rem;
+            letter-spacing: 0.1em;
+            border-radius: 6px;
+            border: 1px solid var(--accent);
+            background: rgba(0,212,255,0.1);
+            color: var(--accent);
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            text-transform: uppercase;
+            min-height: 44px;
+            touch-action: manipulation;
+        }
+
+        .send-btn:hover { background: rgba(0,212,255,0.22); box-shadow: var(--glow); }
+
+        .reset-btn {
+            padding: 11px 12px;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            font-size: 0.85rem;
+            letter-spacing: 0.08em;
+            border-radius: 6px;
+            border: 1px solid var(--warn);
+            background: rgba(255,107,53,0.1);
+            color: var(--warn);
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            white-space: nowrap;
+            min-height: 44px;
+            touch-action: manipulation;
+        }
+
+        .reset-btn:hover { background: rgba(255,107,53,0.22); box-shadow: 0 0 10px rgba(255,107,53,0.4); }
+
+        .send-reset-row { display: flex; gap: 8px; }
+        .send-reset-row .send-btn { flex: 1; }
+
+        .input-unit {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--dim);
+            white-space: nowrap;
+        }
+
+        .fan-dropdown-wrap {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            z-index: 500;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .fan-dropdown-trigger {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 8px 14px;
+            background: var(--panel);
+            border: 1px solid var(--accent2);
+            border-radius: 7px;
+            color: var(--accent2);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.82rem;
+            cursor: pointer;
+            box-shadow: var(--glow2);
+            transition: background 0.2s;
+            white-space: nowrap;
+            user-select: none;
+        }
+
+        .fan-dropdown-trigger:hover { background: rgba(0,255,157,0.1); }
+        .fan-dropdown-trigger .arrow { font-size: 0.6rem; transition: transform 0.2s; display: inline-block; }
+        .fan-dropdown-wrap.open .arrow { transform: rotate(180deg); }
+
+        .fan-dropdown-menu {
+            display: none;
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
+            background: var(--panel);
+            border: 1px solid var(--accent2);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5), var(--glow2);
+            min-width: 130px;
+        }
+
+        .fan-dropdown-wrap.open .fan-dropdown-menu { display: block; }
+
+        .fan-dropdown-item {
+            padding: 9px 16px;
+            font-size: 0.82rem;
+            color: var(--dim);
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+            border-bottom: 1px solid rgba(30,58,95,0.5);
+        }
+
+        .fan-dropdown-item:last-child { border-bottom: none; }
+        .fan-dropdown-item:hover { background: rgba(0,255,157,0.1); color: var(--accent2); }
+        .fan-dropdown-item.active { background: rgba(0,255,157,0.15); color: var(--accent2); }
+
+        .timer-part { text-align: center; -moz-appearance: textfield; }
+        .timer-part::-webkit-inner-spin-button,
+        .timer-part::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+        .voice-btn-wrap {
+            position: fixed;
+            bottom: 28px;
+            right: 24px;
+            z-index: 600;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .voice-btn {
+            width: 62px; height: 62px;
+            border-radius: 50%;
+            border: 2px solid var(--accent);
+            background: rgba(0,212,255,0.1);
+            color: var(--accent);
+            font-size: 1.6rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--glow);
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .voice-btn:hover { background: rgba(0,212,255,0.22); }
+
+        .voice-btn.listening {
+            border-color: var(--danger);
+            background: rgba(255,45,85,0.15);
+            color: var(--danger);
+            box-shadow: 0 0 0 0 rgba(255,45,85,0.6);
+            animation: pulse-ring 1.2s ease-out infinite;
+        }
+
+        @keyframes pulse-ring {
+            0%   { box-shadow: 0 0 0 0   rgba(255,45,85,0.6); }
+            70%  { box-shadow: 0 0 0 18px rgba(255,45,85,0);   }
+            100% { box-shadow: 0 0 0 0   rgba(255,45,85,0);   }
+        }
+
+        .voice-label { font-family: 'Share Tech Mono', monospace; font-size: 0.65rem; color: var(--dim); letter-spacing: 0.1em; text-align: center; }
+
+        .voice-transcript {
+            position: fixed;
+            bottom: 110px;
+            right: 16px;
+            left: 16px;
+            max-width: 360px;
+            margin: 0 auto;
+            background: var(--panel);
+            border: 1px solid var(--accent);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.78rem;
+            color: var(--accent);
+            box-shadow: var(--glow);
+            display: none;
+            z-index: 601;
+            text-align: center;
+            pointer-events: none;
+        }
+
+        .voice-transcript.show { display: block; }
+
+        .loop-toggle-row { display: flex; gap: 10px; align-items: center; }
+        .loop-btn {
+            flex: 1;
+            padding: 12px 8px;
+            font-family: 'Rajdhani', sans-serif;
+            font-weight: 700;
+            font-size: 1rem;
+            letter-spacing: 0.08em;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: rgba(0,0,0,0.3);
+            color: var(--dim);
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            min-height: 48px;
+            touch-action: manipulation;
+        }
+        .loop-btn.loop-on  { border-color: var(--accent2); background: rgba(0,255,157,0.15); color: var(--accent2); box-shadow: var(--glow2); }
+        .loop-btn.loop-off { border-color: var(--warn); background: rgba(255,107,53,0.12); color: var(--warn); }
+
+        #toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            background: var(--panel);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.8rem;
+            letter-spacing: 0.1em;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: var(--glow);
+            transition: transform 0.3s ease;
+            z-index: 999;
+            pointer-events: none;
+        }
+
+        #toast.show { transform: translateX(-50%) translateY(0); }
+
+        .val-display { font-family: 'Share Tech Mono', monospace; font-size: 0.75rem; color: var(--dim); margin-top: 8px; text-align: right; }
+        .val-display span { color: var(--accent2); }
+    </style>
+</head>
+<body>
+
+<div class="fan-dropdown-wrap" id="fanDropdown">
+    <div class="fan-dropdown-trigger" onclick="toggleFanDropdown()">
+        <span id="fanSelVal">Fan 1</span>
+        <span class="arrow">▼</span>
+    </div>
+    <div class="fan-dropdown-menu" id="fanDropdownMenu">
+        <div class="fan-dropdown-item" id="fanSelBtn1"  onclick="setFanSelect(1)">Fan 1</div>
+        <div class="fan-dropdown-item" id="fanSelBtn2"  onclick="setFanSelect(2)">Fan 2</div>
+        <div class="fan-dropdown-item" id="fanSelBtn3"  onclick="setFanSelect(3)">Fan 3</div>
+        <div class="fan-dropdown-item" id="fanSelBtn4"  onclick="setFanSelect(4)">Fan 4</div>
+        <div class="fan-dropdown-item" id="fanSelBtn5"  onclick="setFanSelect(5)">Fan 5</div>
+        <div class="fan-dropdown-item" id="fanSelBtn6"  onclick="setFanSelect(6)">Fan 6</div>
+        <div class="fan-dropdown-item" id="fanSelBtn7"  onclick="setFanSelect(7)">Fan 7</div>
+        <div class="fan-dropdown-item" id="fanSelBtn8"  onclick="setFanSelect(8)">Fan 8</div>
+        <div class="fan-dropdown-item" id="fanSelBtn9"  onclick="setFanSelect(9)">Fan 9</div>
+        <div class="fan-dropdown-item" id="fanSelBtn10" onclick="setFanSelect(10)">Fan 10</div>
+    </div>
+</div>
+
+<header>
+    <h1>ESP32 Control Panel</h1>
+    <div class="sub">Firebase Realtime Database</div>
+</header>
+
+<div class="status-bar">
+    <div>
+        <span class="status-dot" id="fbDot"></span>
+        <span id="fbStatus" style="color:var(--dim)">Connecting...</span>
+    </div>
+    <div style="color:var(--dim)">|</div>
+    <div style="font-size:0.75rem; color:var(--dim)">MODE: <span id="modeDisplay" style="color:var(--accent)">—</span></div>
+    <div style="color:var(--dim)">|</div>
+    <div style="font-size:0.75rem; color:var(--dim)">PWR: <span id="pwrDisplay" style="color:var(--dim)">—</span></div>
+</div>
+
+<div class="grid">
+
+    <!-- Mode -->
+    <div class="card">
+        <div class="card-label">Operating Mode</div>
+        <div class="mode-toggle">
+            <button class="mode-btn" id="btnAuto"   onclick="setMode('auto')">⚙ Auto</button>
+            <button class="mode-btn" id="btnManual" onclick="setMode('manual')">🕹 Manual</button>
+        </div>
+    </div>
+
+    <!-- Power -->
+    <div class="card">
+        <div class="card-label">Power Control</div>
+        <div class="power-row">
+            <button class="power-btn btn-on"  onclick="setPower(1)">▶ ON</button>
+            <button class="power-btn btn-off" onclick="setPower(0)">■ OFF</button>
+        </div>
+        <div class="val-display">Status: <span id="pwrVal">—</span></div>
+    </div>
+
+    <!-- Sensor Readings -->
+    <div class="card full">
+        <div class="card-label">Sensor Readings</div>
+        <div style="display:flex; gap:12px; align-items:center; justify-content:center; flex-wrap:wrap;">
+            <div style="text-align:center;">
+                <div style="font-size:0.7rem; color:var(--dim); letter-spacing:0.1em; margin-bottom:4px;">TEMPERATURE</div>
+                <div style="font-family:'Share Tech Mono',monospace; font-size:1.8rem; color:var(--accent); letter-spacing:0.05em;">
+                    <span id="sensorTemp">—</span><span style="font-size:1rem; color:var(--dim);"> °C</span>
+                </div>
+            </div>
+            <div style="width:1px; height:40px; background:var(--border);"></div>
+            <div style="text-align:center;">
+                <div style="font-size:0.7rem; color:var(--dim); letter-spacing:0.1em; margin-bottom:4px;">HUMIDITY</div>
+                <div style="font-family:'Share Tech Mono',monospace; font-size:1.8rem; color:var(--accent2); letter-spacing:0.05em;">
+                    <span id="sensorHum">—</span><span style="font-size:1rem; color:var(--dim);"> %</span>
+                </div>
+            </div>
+        </div>
+        <div class="val-display" style="text-align:center; margin-top:8px;">Updated: <span id="sensorTime">—</span></div>
+    </div>
+
+    <!-- Fan Speed 0-3 -->
+    <div class="card full">
+        <div class="card-label">Fan Speed (0–3)</div>
+        <div class="fan-speed-row">
+            <button class="fan-btn" id="fanBtn0" onclick="setFanSpeed(0)">0<br><span style="font-size:0.6rem;color:var(--dim)">OFF</span></button>
+            <button class="fan-btn" id="fanBtn1" onclick="setFanSpeed(1)">1<br><span style="font-size:0.6rem;color:var(--dim)">LOW</span></button>
+            <button class="fan-btn" id="fanBtn2" onclick="setFanSpeed(2)">2<br><span style="font-size:0.6rem;color:var(--dim)">MED</span></button>
+            <button class="fan-btn" id="fanBtn3" onclick="setFanSpeed(3)">3<br><span style="font-size:0.6rem;color:var(--dim)">HIGH</span></button>
+        </div>
+        <div class="val-display">Speed: <span id="speedVal">—</span></div>
+    </div>
+
+    <!-- Fan Loop — แสดงเฉพาะตอน Manual mode -->
+    <div class="card full" id="loopCard" style="display:none;">
+        <div class="card-label">Fan Loop</div>
+        <div class="loop-toggle-row">
+            <button class="loop-btn loop-on" id="btnLoopOn"  onclick="setLoopMode(1)">↻ Loop ON</button>
+            <button class="loop-btn"          id="btnLoopOff" onclick="setLoopMode(0)">⏹ Loop OFF</button>
+        </div>
+        <div class="val-display">Mode: <span id="loopVal">ON</span></div>
+    </div>
+
+    <!-- Direction — แสดงเฉพาะเมื่อ Loop OFF และ Manual mode -->
+    <div class="card full" id="directionCard" style="display:none;">
+        <div class="card-label">Direction Control</div>
+        <div class="direction-grid">
+            <button class="dir-btn" onclick="sendDirection('left')">← Turn Left</button>
+            <button class="dir-btn" onclick="sendDirection('right')">Turn Right →</button>
+        </div>
+    </div>
+
+    <!-- Temperature -->
+    <div class="card full">
+        <div class="card-label">Min Temperature</div>
+        <div class="input-action-row">
+            <input class="ctrl-input" type="number" id="tempInput" placeholder="°C  e.g. 25" step="0.1">
+            <button class="send-btn" onclick="sendTemp()">Set</button>
+            <button class="reset-btn" onclick="resetTemp()">↺</button>
+        </div>
+        <div class="val-display">Min: <span id="tempVal">—</span></div>
+    </div>
+
+    <!-- Humidity -->
+    <div class="card full">
+        <div class="card-label">Min Humidity</div>
+        <div class="input-action-row">
+            <input class="ctrl-input" type="number" id="humInput" placeholder="%  0 – 100" min="0" max="100" step="1">
+            <button class="send-btn" onclick="sendHumidity()">Set</button>
+            <button class="reset-btn" onclick="resetHumidity()">↺</button>
+        </div>
+        <div class="val-display">Min: <span id="humVal">—</span></div>
+    </div>
+
+    <!-- Timer -->
+    <div class="card full">
+        <div class="card-label">Timer</div>
+        <div class="input-group">
+            <div class="input-row">
+                <input class="ctrl-input timer-part" type="number" id="timeHour" placeholder="HH" min="0" max="23" step="1" oninput="autoFocusMin(this)">
+                <span class="input-unit" style="font-size:1.2rem; color:var(--accent); padding:0 4px;">:</span>
+                <input class="ctrl-input timer-part" type="number" id="timeMin"  placeholder="MM" min="0" max="59" step="1">
+            </div>
+            <div class="send-reset-row">
+                <button class="send-btn"  onclick="sendTime()">Set Timer</button>
+                <button class="reset-btn" onclick="resetTimer()">↺ Reset Timer</button>
+            </div>
+        </div>
+        <div class="val-display">Scheduled: <span id="timeVal">—</span></div>
+    </div>
+
+</div>
+
+<div id="toast"></div>
+
+<div class="voice-btn-wrap">
+    <div class="voice-btn" id="voiceBtn" onclick="toggleVoice()" title="กดพูดคำสั่ง">🎤</div>
+    <div class="voice-label" id="voiceLabel">VOICE</div>
+</div>
+<div class="voice-transcript" id="voiceTranscript"></div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyC-Yt6Mg20M5x1ZkO83P23SMofKGU7cwe8",
+        authDomain: "global-html-test1.firebaseapp.com",
+        databaseURL: "https://global-html-test1-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "global-html-test1",
+        storageBucket: "global-html-test1.firebasestorage.app",
+        messagingSenderId: "248231886536",
+        appId: "1:248231886536:web:3bcbca9ff423cbf619affd"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // --- Status indicator ---
+    db.ref('.info/connected').on('value', snap => {
+        const connected = snap.val();
+        document.getElementById('fbDot').className = 'status-dot' + (connected ? ' on' : '');
+        document.getElementById('fbStatus').textContent = connected ? 'Firebase Connected' : 'Disconnected';
+        document.getElementById('fbStatus').style.color = connected ? 'var(--accent2)' : 'var(--danger)';
+    });
+
+    // --- Toast helper ---
+    let toastTimer;
+    function toast(msg, color = 'var(--accent)') {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.style.borderColor = color;
+        el.style.color = color;
+        el.style.boxShadow = `0 0 12px ${color}66`;
+        el.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+    }
+
+    // ✅ FIX I1 + I2: helper กลาง — ทุก visibility logic ผ่านฟังก์ชันนี้เสมอ
+    // อ่าน state จาก DOM โดยตรง ไม่ขึ้นกับ call order
+    function syncCardVisibility() {
+        const isManual = document.getElementById('btnManual').classList.contains('active-manual');
+        const isLoopOff = document.getElementById('btnLoopOff').classList.contains('loop-off'); // ✅ FIX I1: เดิมเช็ค 'loop-on' ผิด
+        document.getElementById('loopCard').style.display      = isManual ? '' : 'none';
+        document.getElementById('directionCard').style.display = (isManual && isLoopOff) ? '' : 'none';
+    }
+
+    // --- Mode ---
+    function setMode(mode) {
+        db.ref('/control/mode').set(mode)
+            .then(() => {
+                document.getElementById('btnAuto').className   = 'mode-btn' + (mode === 'auto'   ? ' active-auto'   : '');
+                document.getElementById('btnManual').className = 'mode-btn' + (mode === 'manual' ? ' active-manual' : '');
+                document.getElementById('modeDisplay').textContent = mode.toUpperCase();
+                document.getElementById('modeDisplay').style.color = mode === 'auto' ? 'var(--accent)' : 'var(--accent2)';
+                syncCardVisibility(); // ✅ FIX I2: เรียก helper เดียว
+                toast(`Mode: ${mode.toUpperCase()}`);
+            })
+            .catch(() => toast('Firebase write failed', 'var(--danger)'));
+    }
+
+    // --- Power ---
+    function setPower(val) {
+        db.ref('/control/power').set(val)
+            .then(() => {
+                const on = val === 1;
+                document.getElementById('pwrVal').textContent = on ? 'ON 🟢' : 'OFF 🔴';
+                document.getElementById('pwrVal').style.color = on ? 'var(--accent2)' : 'var(--danger)';
+                document.getElementById('pwrDisplay').textContent = on ? 'ON' : 'OFF';
+                document.getElementById('pwrDisplay').style.color = on ? 'var(--accent2)' : 'var(--danger)';
+                toast(on ? 'Power ON' : 'Power OFF', on ? 'var(--accent2)' : 'var(--danger)');
+            })
+            .catch(() => toast('Firebase write failed', 'var(--danger)'));
+    }
+
+    // --- Fan Speed 0-3 ---
+    let currentSpeed = 0;
+
+    function setFanSpeed(val) {
+        currentSpeed = val;
+        db.ref('/control/speed').set(val)
+            .then(() => {
+                updateFanButtons(val);
+                const labels = ['OFF', 'LOW', 'MED', 'HIGH'];
+                document.getElementById('speedVal').textContent = `${val} (${labels[val]})`;
+                toast(`Fan Speed: ${val} - ${labels[val]}`);
+            })
+            .catch(() => toast('Firebase write failed', 'var(--danger)'));
+    }
+
+    function updateFanButtons(val) {
+        for (let i = 0; i <= 3; i++) {
+            const btn = document.getElementById(`fanBtn${i}`);
+            btn.className = 'fan-btn' + (i === val ? ' active' : '');
+        }
+    }
+
+    // --- Fan Loop Mode ---
+    function setLoopMode(val) {
+        db.ref('/control/loopMode').set(val)
+            .then(() => {
+                updateLoopButtons(val);
+                toast(val ? 'Loop ON' : 'Loop OFF', val ? 'var(--accent2)' : 'var(--warn)');
+            })
+            .catch(() => toast('Firebase write failed', 'var(--danger)'));
+    }
+
+    function updateLoopButtons(val) {
+        document.getElementById('btnLoopOn').className  = 'loop-btn' + (val === 1 ? ' loop-on'  : '');
+        document.getElementById('btnLoopOff').className = 'loop-btn' + (val === 0 ? ' loop-off' : '');
+        document.getElementById('loopVal').textContent  = val === 1 ? 'ON ↻' : 'OFF ⏹';
+        syncCardVisibility(); // ✅ FIX I2: เรียก helper เดียว ไม่ซ้ำ logic
+    }
+
+    // --- Sensor Readings (realtime from /status) ---
+    db.ref('/status/temperature').on('value', snap => {
+        const v = snap.val();
+        if (v !== null) document.getElementById('sensorTemp').textContent = parseFloat(v).toFixed(1);
+    });
+    db.ref('/status/humidity').on('value', snap => {
+        const v = snap.val();
+        if (v !== null) {
+            document.getElementById('sensorHum').textContent = parseFloat(v).toFixed(1);
+            const now = new Date();
+            document.getElementById('sensorTime').textContent =
+                String(now.getHours()).padStart(2,'0') + ':' +
+                String(now.getMinutes()).padStart(2,'0') + ':' +
+                String(now.getSeconds()).padStart(2,'0');
+        }
+    });
+
+    // --- Power (realtime) — อัปเดต UI ทันทีเมื่อ Firebase เปลี่ยน (timer / sender) ---
+    db.ref('/control/power').on('value', snap => {
+        const val = snap.val();
+        if (val === null) return;
+        const on = val === 1;
+        document.getElementById('pwrVal').textContent      = on ? 'ON 🟢' : 'OFF 🔴';
+        document.getElementById('pwrVal').style.color      = on ? 'var(--accent2)' : 'var(--danger)';
+        document.getElementById('pwrDisplay').textContent  = on ? 'ON' : 'OFF';
+        document.getElementById('pwrDisplay').style.color  = on ? 'var(--accent2)' : 'var(--danger)';
+    });
+
+    // --- RTC Auto-Sync ---
+    function autoSyncRTC() {
+        const now = new Date();
+        const hh  = String(now.getHours()).padStart(2,'0');
+        const mm  = String(now.getMinutes()).padStart(2,'0');
+        const ss  = String(now.getSeconds()).padStart(2,'0');
+        db.ref('/control/syncTime').set(hh + ':' + mm + ':' + ss)
+            .catch(e => console.warn('[RTC auto-sync failed]', e));
+    }
+    autoSyncRTC();
+    setInterval(autoSyncRTC, 60000);
+
+    // --- Direction ---
+    function sendDirection(dir) {
+        db.ref('/control/direction').set('')
+            .then(() => db.ref('/control/direction').set(dir))
+            .then(() => toast(`Direction: ${dir.toUpperCase()}`))
+            .catch(() => toast('Firebase write failed', 'var(--danger)'));
+    }
+
+    // --- Temperature ---
+    function sendTemp() {
+        const raw = document.getElementById('tempInput').value.trim();
+        const val = parseFloat(raw);
+        if (isNaN(val)) { toast('Enter a valid temperature', 'var(--warn)'); return; }
+        db.ref('/control/temperature').set(val)
+            .then(() => { document.getElementById('tempVal').textContent = val + ' °C'; toast(`Min Temp set: ${val}°C`); })
+            .catch(() => toast('Firebase write failed', 'var(--danger)'));
+    }
+
+    function resetTemp() {
+        db.ref('/control/temperature').set(null)
+            .then(() => { document.getElementById('tempInput').value = ''; document.getElementById('tempVal').textContent = '—'; toast('Min Temp reset', 'var(--warn)'); })
+            .catch(() => toast('Firebase write failed', 'var(--danger)'));
+    }
+
+    // --- Humidity ---
+    function sendHumidity() {
+        const raw = document.getElementById('humInput').value.trim();
+        const val = parseInt(raw);
+        if (isNaN(val) || val < 0 || val > 100) { toast('Humidity must be 0 – 100', 'var(--warn)'); return; }
+        db.ref('/control/humidity').set(val)
+            .then(() => { document.getElementById('humVal').textContent = val + ' %'; toast(`Min Humidity set: ${val}%`); })
+            .catch(() => toast('Firebase write failed', 'var(--danger)'));
+    }
+
+    function resetHumidity() {
+        db.ref('/control/humidity').set(null)
+            .then(() => { document.getElementById('humInput').value = ''; document.getElementById('humVal').textContent = '—'; toast('Min Humidity reset', 'var(--warn)'); })
+            .catch(() => toast('Firebase write failed', 'var(--danger)'));
+    }
+
+    // --- Timer ---
+    function autoFocusMin(el) {
+        if (el.value.length >= 2) document.getElementById('timeMin').focus();
+    }
+
+    function sendTime() {
+        const h = parseInt(document.getElementById('timeHour').value) || 0;
+        const m = parseInt(document.getElementById('timeMin').value)  || 0;
+        if (h === 0 && m === 0) { toast('กรุณากรอกเวลา', 'var(--warn)'); return; }
+        const raw = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+        db.ref('/control/timer').set({ time_str: raw, total_seconds: h * 3600 + m * 60 })
+            .then(() => { document.getElementById('timeVal').textContent = raw; toast('Timer set: ' + raw); })
+            .catch(() => toast('Firebase write failed', 'var(--danger)'));
+    }
+
+    function resetTimer() {
+        db.ref('/control/timer').set(null)
+            .then(() => {
+                document.getElementById('timeHour').value = '';
+                document.getElementById('timeMin').value  = '';
+                document.getElementById('timeVal').textContent = '—';
+                toast('Timer reset', 'var(--warn)');
+            })
+            .catch(() => toast('Firebase write failed', 'var(--danger)'));
+    }
+
+    // --- Read current values on load ---
+    // ✅ FIX I2: อ่านค่าทั้งหมดก่อน แล้วค่อย syncCardVisibility() 1 ครั้งตอนท้าย
+    db.ref('/control').once('value', snap => {
+        const d = snap.val();
+        if (!d) return;
+
+        if (d.mode) {
+            document.getElementById('btnAuto').className   = 'mode-btn' + (d.mode === 'auto'   ? ' active-auto'   : '');
+            document.getElementById('btnManual').className = 'mode-btn' + (d.mode === 'manual' ? ' active-manual' : '');
+            document.getElementById('modeDisplay').textContent = d.mode.toUpperCase();
+            document.getElementById('modeDisplay').style.color = d.mode === 'auto' ? 'var(--accent)' : 'var(--accent2)';
+        }
+        if (d.power !== undefined) {
+            const on = d.power === 1;
+            document.getElementById('pwrVal').textContent = on ? 'ON 🟢' : 'OFF 🔴';
+            document.getElementById('pwrVal').style.color = on ? 'var(--accent2)' : 'var(--danger)';
+            document.getElementById('pwrDisplay').textContent = on ? 'ON' : 'OFF';
+        }
+        if (d.speed !== undefined) {
+            currentSpeed = d.speed;
+            const labels = ['OFF', 'LOW', 'MED', 'HIGH'];
+            updateFanButtons(d.speed);
+            document.getElementById('speedVal').textContent = `${d.speed} (${labels[d.speed] || d.speed})`;
+        }
+        if (d.temperature !== undefined && d.temperature !== null) {
+            document.getElementById('tempVal').textContent = d.temperature + ' °C';
+            document.getElementById('tempInput').value = d.temperature;
+        }
+        if (d.humidity !== undefined && d.humidity !== null) {
+            document.getElementById('humVal').textContent = d.humidity + ' %';
+            document.getElementById('humInput').value = d.humidity;
+        }
+        if (d.timer?.time_str) {
+            document.getElementById('timeVal').textContent = d.timer.time_str;
+            const parts = d.timer.time_str.split(':');
+            if (parts.length === 2) {
+                document.getElementById('timeHour').value = parseInt(parts[0]) || 0;
+                document.getElementById('timeMin').value  = parseInt(parts[1]) || 0;
+            }
+        }
+        if (d.fanSelect !== undefined) {
+            updateFanSelectButtons(d.fanSelect);
+            document.getElementById('fanSelVal').textContent = 'Fan ' + d.fanSelect;
+        }
+        if (d.loopMode !== undefined) {
+            // set loop button state ก่อน โดยไม่ trigger syncCardVisibility ก่อนเวลา
+            document.getElementById('btnLoopOn').className  = 'loop-btn' + (d.loopMode === 1 ? ' loop-on'  : '');
+            document.getElementById('btnLoopOff').className = 'loop-btn' + (d.loopMode === 0 ? ' loop-off' : '');
+            document.getElementById('loopVal').textContent  = d.loopMode === 1 ? 'ON ↻' : 'OFF ⏹';
+        }
+
+        // ✅ FIX I2: sync visibility 1 ครั้ง หลังจาก set ทุก class เสร็จแล้ว
+        syncCardVisibility();
+    });
+
+    // ================================================================
+    //  VOICE COMMAND ENGINE
+    // ================================================================
+    const voiceBtn        = document.getElementById('voiceBtn');
+    const voiceLabel      = document.getElementById('voiceLabel');
+    const voiceTranscript = document.getElementById('voiceTranscript');
+
+    let recognition = null;
+    let isListening = false;
+    let transcriptTimer;
+
+    function showTranscript(text, color = 'var(--accent)') {
+        voiceTranscript.textContent = text;
+        voiceTranscript.style.borderColor = color;
+        voiceTranscript.style.color = color;
+        voiceTranscript.classList.add('show');
+        clearTimeout(transcriptTimer);
+        transcriptTimer = setTimeout(() => voiceTranscript.classList.remove('show'), 3000);
+    }
+
+    function parseVoiceCommand(text) { tryParseCommand(text); }
+
+    function spokenToDigit(s) {
+        const map = { one:1, two:2, three:3, four:4, five:5,
+                      six:6, seven:7, eight:8, nine:9, ten:10 };
+        return map[s.trim()] || parseInt(s) || null;
+    }
+
+    function tryParseCommand(text) {
+        const t = text.toLowerCase().trim();
+        console.log('[VOICE]', t);
+
+        if (t.includes('turn left') || t.includes('rotate left') || t.includes('go left') || t === 'left') {
+            sendDirection('left'); showTranscript('✅ "' + text + '" → Turn Left ←', 'var(--accent)'); return true;
+        }
+        if (t.includes('turn right') || t.includes('rotate right') || t.includes('go right') || t === 'right') {
+            sendDirection('right'); showTranscript('✅ "' + text + '" → Turn Right →', 'var(--accent)'); return true;
+        }
+        if (t.includes('turn off') || t.includes('power off') || t.includes('switch off') ||
+            t.includes('fan off')  || t.includes('shut down')  || t.includes('shutdown') || t === 'off') {
+            setPower(0); showTranscript('✅ "' + text + '" → Power OFF', 'var(--danger)'); return true;
+        }
+        if (t.includes('turn on') || t.includes('power on') || t.includes('switch on') ||
+            t.includes('fan on')  || t.includes('start')    || t === 'on') {
+            setPower(1); showTranscript('✅ "' + text + '" → Power ON', 'var(--accent2)'); return true;
+        }
+        if (t.includes('auto') || t.includes('automatic')) {
+            setMode('auto'); showTranscript('✅ "' + text + '" → Auto Mode', 'var(--accent)'); return true;
+        }
+        if (t.includes('manual')) {
+            setMode('manual'); showTranscript('✅ "' + text + '" → Manual Mode', 'var(--accent2)'); return true;
+        }
+        if (t.includes('fan loop on')  || t.includes('loop on'))  { setLoopMode(1); showTranscript('✅ "' + text + '" → Fan Loop ON ↻',  'var(--accent2)'); return true; }
+        if (t.includes('fan loop off') || t.includes('loop off')) { setLoopMode(0); showTranscript('✅ "' + text + '" → Fan Loop OFF ⏹', 'var(--warn)');    return true; }
+
+        if (t.includes('fan off')   || t.includes('fan zero')   || t.includes('fan 0') || t.includes('speed off') || t.includes('speed zero') || t.includes('speed 0'))
+            { setFanSpeed(0); showTranscript('✅ "' + text + '" → Fan Speed 0 (OFF)', 'var(--accent)'); return true; }
+        if (t.includes('fan low')   || t.includes('fan one')    || t.includes('fan 1') || t.includes('speed low') || t.includes('speed one')  || t.includes('speed 1') || t.includes('low speed'))
+            { setFanSpeed(1); showTranscript('✅ "' + text + '" → Fan Speed 1 LOW', 'var(--accent)'); return true; }
+        if (t.includes('fan medium')   || t.includes('fan two')    || t.includes('fan 2') || t.includes('fan med') || t.includes('speed medium') || t.includes('speed two')  || t.includes('speed 2') || t.includes('medium speed'))
+            { setFanSpeed(2); showTranscript('✅ "' + text + '" → Fan Speed 2 MED', 'var(--accent)'); return true; }
+        if (t.includes('fan high')   || t.includes('fan three')  || t.includes('fan 3') || t.includes('full speed') || t.includes('speed high') || t.includes('speed three') || t.includes('speed 3') || t.includes('high speed'))
+            { setFanSpeed(3); showTranscript('✅ "' + text + '" → Fan Speed 3 HIGH', 'var(--accent)'); return true; }
+
+        if (t.includes('fan up') || t.includes('speed up') || t.includes('faster') || t.includes('increase')) {
+            const next = Math.min(currentSpeed + 1, 3);
+            if (next === currentSpeed) { showTranscript('⚠️ Already at max speed', 'var(--warn)'); return true; }
+            const labels = ['OFF','LOW','MED','HIGH'];
+            setFanSpeed(next); showTranscript('✅ "' + text + '" → Fan Up → ' + next + ' ' + labels[next], 'var(--accent)'); return true;
+        }
+        if (t.includes('fan down') || t.includes('speed down') || t.includes('slower') || t.includes('slow down')) {
+            const next = Math.max(currentSpeed - 1, 0);
+            if (next === currentSpeed) { showTranscript('⚠️ Already at min speed', 'var(--warn)'); return true; }
+            const labels = ['OFF','LOW','MED','HIGH'];
+            setFanSpeed(next); showTranscript('✅ "' + text + '" → Fan Down → ' + next + ' ' + labels[next], 'var(--accent)'); return true;
+        }
+
+        const timerMatch = t.match(/timer[^0-9]*(?:([0-9]+)\s*hour[s]?)?[^0-9]*(?:([0-9]+)\s*min(?:ute)?[s]?)?/);
+        if (timerMatch && (timerMatch[1] || timerMatch[2])) {
+            const h = parseInt(timerMatch[1]) || 0;
+            const m = parseInt(timerMatch[2]) || 0;
+            if (h > 0 || m > 0) {
+                const raw = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+                db.ref('/control/timer').set({ time_str: raw, total_seconds: h*3600 + m*60 })
+                    .then(() => { document.getElementById('timeVal').textContent = raw; document.getElementById('timeHour').value = h; document.getElementById('timeMin').value = m; showTranscript('✅ "' + text + '" → Timer ' + raw, 'var(--accent2)'); });
+                return true;
+            }
+        }
+
+        const fanNumMatch = t.match(/(?:select\s+fan|fan\s+number|switch\s+to\s+fan|fan)\s+([a-z0-9]+)/);
+        if (fanNumMatch) {
+            const n = spokenToDigit(fanNumMatch[1]);
+            if (n >= 1 && n <= 10) { setFanSelect(n); showTranscript('✅ "' + text + '" → Fan ' + n, 'var(--accent2)'); return true; }
+        }
+
+        return false;
+    }
+
+    function toggleVoice() {
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) { showTranscript('❌ Use Chrome browser', 'var(--danger)'); return; }
+        if (isListening) { recognition.stop(); return; }
+
+        recognition = new SR();
+        recognition.lang            = 'en-US';
+        recognition.interimResults  = true;
+        recognition.continuous      = true;
+        recognition.maxAlternatives = 5;
+
+        const SGL = window.SpeechGrammarList || window.webkitSpeechGrammarList;
+        if (SGL) {
+            const keywords = [
+                'turn on', 'turn off', 'power on', 'power off', 'on', 'off', 'start', 'stop', 'shut down',
+                'auto', 'manual', 'automatic',
+                'fan off', 'fan low', 'fan medium', 'fan high',
+                'fan one', 'fan two', 'fan three', 'fan up', 'fan down',
+                'speed off', 'speed low', 'speed medium', 'speed high',
+                'low speed', 'medium speed', 'high speed', 'full speed',
+                'speed up', 'speed down', 'faster', 'slower', 'slow down',
+                'fan loop on', 'fan loop off', 'loop on', 'loop off',
+                'turn left', 'turn right', 'left', 'right', 'rotate left', 'rotate right',
+                'timer', 'fan',
+                'select fan one', 'select fan two', 'select fan three',
+                'select fan four', 'select fan five', 'select fan six',
+                'select fan seven', 'select fan eight', 'select fan nine', 'select fan ten',
+                'fan one', 'fan two', 'fan three', 'fan four', 'fan five',
+                'fan six', 'fan seven', 'fan eight', 'fan nine', 'fan ten'
+            ];
+            const grammar = '#JSGF V1.0; grammar cmds; public <cmd> = ' + keywords.join(' | ') + ';';
+            const list = new SGL();
+            list.addFromString(grammar, 1);
+            recognition.grammars = list;
+        }
+
+        recognition.onstart = () => {
+            isListening = true;
+            voiceBtn.classList.add('listening');
+            voiceBtn.textContent   = '🔴';
+            voiceLabel.textContent = 'LISTENING';
+            showTranscript('🎤 Listening... (tap to stop)', 'var(--accent)');
+        };
+
+        recognition.onresult = (e) => {
+            let interim = '';
+            for (let i = e.resultIndex; i < e.results.length; i++) {
+                if (e.results[i].isFinal) {
+                    let matched = false;
+                    for (let a = 0; a < e.results[i].length; a++) {
+                        const candidate = e.results[i][a].transcript;
+                        console.log('[ALT' + a + ']', candidate);
+                        if (tryParseCommand(candidate)) { matched = true; break; }
+                    }
+                    if (matched) { isListening = false; recognition.stop(); }
+                    else showTranscript('❓ Not understood: "' + e.results[i][0].transcript + '"', 'var(--warn)');
+                } else {
+                    interim += e.results[i][0].transcript;
+                }
+            }
+            if (interim) showTranscript('🎤 ' + interim + '...', 'var(--dim)');
+        };
+
+        recognition.onerror = (e) => {
+            if (e.error === 'no-speech') return;
+            const msg = { 'not-allowed': '❌ Mic blocked — allow mic in Chrome settings', 'network': '❌ Network error', 'aborted': '' }[e.error] || ('❌ Error: ' + e.error);
+            if (msg) showTranscript(msg, 'var(--danger)');
+        };
+
+        recognition.onend = () => {
+            if (isListening) { try { recognition.start(); } catch(e) {} return; }
+            voiceBtn.classList.remove('listening');
+            voiceBtn.textContent   = '🎤';
+            voiceLabel.textContent = 'VOICE';
+        };
+
+        try { recognition.start(); }
+        catch(e) { showTranscript('❌ ' + e.message, 'var(--danger)'); }
+    }
+
+    // --- Fan Select Dropdown ---
+    function toggleFanDropdown() { document.getElementById('fanDropdown').classList.toggle('open'); }
+
+    document.addEventListener('click', function(e) {
+        const wrap = document.getElementById('fanDropdown');
+        if (!wrap.contains(e.target)) wrap.classList.remove('open');
+    });
+
+    function setFanSelect(val) {
+        db.ref('/control/fanSelect').set(val)
+            .then(() => {
+                updateFanSelectButtons(val);
+                document.getElementById('fanSelVal').textContent = 'Fan ' + val;
+                document.getElementById('fanDropdown').classList.remove('open');
+                toast('Fan ' + val + ' selected', 'var(--accent2)');
+            })
+            .catch(() => toast('Firebase write failed', 'var(--danger)'));
+    }
+
+    function updateFanSelectButtons(val) {
+        for (let i = 1; i <= 10; i++) {
+            const btn = document.getElementById('fanSelBtn' + i);
+            if (btn) btn.className = 'fan-dropdown-item' + (i === val ? ' active' : '');
+        }
+    }
+</script>
+</body>
+</html>
